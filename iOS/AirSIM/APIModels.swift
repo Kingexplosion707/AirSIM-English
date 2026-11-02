@@ -199,8 +199,8 @@ struct AndroidSIMSlot: Codable, Equatable, Identifiable, Sendable {
            !carrierName.isEmpty, !label.localizedCaseInsensitiveContains(carrierName) {
             values.append(carrierName)
         }
-        if isDefaultVoice == true { values.append("默认语音") }
-        if isDefaultSMS == true { values.append("默认短信") }
+        if isDefaultVoice == true { values.append("Default voice") }
+        if isDefaultSMS == true { values.append("Default SMS") }
         return values.isEmpty ? nil : values.joined(separator: " · ")
     }
 }
@@ -325,6 +325,8 @@ struct SMSMessage: Codable, Equatable, Sendable, Identifiable {
     var direction: SMSDirection? = nil
     /// Known authenticated producer. Legacy records remain explicitly unscoped.
     var sourceAgentID: String? = nil
+    /// Android subscription slot label ("SIM 1"/"SIM 2"); absent on legacy records.
+    var simSlot: String? = nil
 
     var isOutgoing: Bool { direction == .outgoing }
 
@@ -343,6 +345,7 @@ struct SMSMessage: Codable, Equatable, Sendable, Identifiable {
         case sender, content, code, timestamp, direction
         case deliveryID = "delivery_id"
         case sourceAgentID = "source_agent_id"
+        case simSlot = "sim_slot"
     }
 }
 
@@ -802,7 +805,7 @@ struct ESIMProfile: Codable, Sendable, Identifiable {
 
     var id: String { iccid ?? name ?? UUID().uuidString }
     var enabled: Bool { state == 1 }
-    var displayName: String { name ?? serviceProviderName ?? iccid ?? "未命名 Profile" }
+    var displayName: String { name ?? serviceProviderName ?? iccid ?? "Unnamed Profile" }
 
     enum CodingKeys: String, CodingKey {
         case iccid, name, state
@@ -869,6 +872,36 @@ struct ESIMPhonebookProbe: Codable, Sendable {
 }
 
 // MARK: - 诊断与语音运行时
+
+struct AgentFeedbackSnapshot: Codable, Sendable {
+    let bridgeLog: String?
+    let runtimeProfile: String?
+    let manufacturer: String?
+    let model: String?
+    let sdk: Int?
+    let appVersion: String?
+    let audio: AgentFeedbackAudio?
+
+    enum CodingKeys: String, CodingKey {
+        case bridgeLog = "bridge_log"
+        case runtimeProfile = "runtime_profile"
+        case manufacturer, model, sdk
+        case appVersion = "app_version"
+        case audio
+    }
+}
+
+struct AgentFeedbackAudio: Codable, Sendable {
+    let telecomState: String?
+    let pcmClientClosed: Bool?
+    let pcmHealth: String?
+
+    enum CodingKeys: String, CodingKey {
+        case telecomState = "telecom_state"
+        case pcmClientClosed = "pcm_client_closed"
+        case pcmHealth = "pcm_health"
+    }
+}
 
 struct ModuleDebugSnapshot: Codable, Sendable {
     let debug: ModuleDebugBufferStatus
