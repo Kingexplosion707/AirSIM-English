@@ -38,13 +38,13 @@ struct AgentVerboseTextDocument: FileDocument {
 }
 
 enum AgentVerboseTraceFilter: String, CaseIterable, Identifiable {
-    case all = "全部"
-    case failures = "错误"
-    case calls = "通话"
-    case relay = "Relay / 云端"
+    case all = "All"
+    case failures = "Errors"
+    case calls = "Calls"
+    case relay = "Relay / Cloud"
     case vowlan = "VoWLAN"
     case voble = "VoBLE"
-    case sms = "短信"
+    case sms = "SMS"
 
     var id: String { rawValue }
 
@@ -108,7 +108,7 @@ final class AgentVerboseTraceViewModel: ObservableObject {
     @Published var enabled = false
     @Published var localEntries: [AgentVerboseTraceEntry] = []
     @Published var agentEvents: [ModuleDebugEvent] = []
-    @Published var agentState = "仅本机日志"
+    @Published var agentState = "Local logs only"
     @Published private(set) var readingAgent = false
     @Published var errorMessage: String?
     @Published var exportText = "AirSIM Agent Verbose Trace\n"
@@ -165,7 +165,7 @@ final class AgentVerboseTraceViewModel: ObservableObject {
             return
         } catch {
             guard generation == clearGeneration else { return }
-            agentState = "Agent 不可达"
+            agentState = "Agent unreachable"
             errorMessage = error.localizedDescription
         }
         await refresh()
@@ -177,7 +177,7 @@ final class AgentVerboseTraceViewModel: ObservableObject {
         localEntries = []
         agentEvents = []
         lastSequence = 0
-        agentState = "本机日志已清除（不修改安卓日志）"
+        agentState = "Local logs cleared (Android logs unchanged)"
         errorMessage = nil
         await refresh()
     }
@@ -300,8 +300,8 @@ struct AgentVerboseTraceView: View {
                     Toggle(isOn: Binding(get: { model.enabled }, set: model.setEnabled)) {
                         Label {
                             VStack(alignment: .leading, spacing: 3) {
-                                Text("Verbose 模式")
-                                Text(model.enabled ? "记录通话、VoWLAN、VoBLE 与云端链路事件" : "关闭详细采集，保留基础音频启动记录")
+                                Text("Verbose mode")
+                                Text(model.enabled ? "Records call, VoWLAN, VoBLE, and cloud link events" : "Detailed capture off; only basic audio-start records are kept")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
@@ -311,26 +311,26 @@ struct AgentVerboseTraceView: View {
                         }
                     }
 
-                    LabeledContent("Agent 通道", value: model.agentState)
-                    LabeledContent("本机链路", value: "\(model.localEntries.count) 条")
-                    LabeledContent("Agent 事件", value: "\(model.agentEvents.count) 条")
+                    LabeledContent("Agent channel", value: model.agentState)
+                    LabeledContent("Local links", value: "\(model.localEntries.count) entries")
+                    LabeledContent("Agent events", value: "\(model.agentEvents.count) entries")
                     Button {
                         Task { await model.readAgent() }
                     } label: {
                         HStack {
-                            Label("手动读取安卓日志", systemImage: "arrow.down.doc")
+                            Label("Read Android logs manually", systemImage: "arrow.down.doc")
                             if model.readingAgent { ProgressView() }
                         }
                     }
                     .disabled(!model.canReadAgent)
                 } header: {
-                    Text("链式调试")
+                    Text("Chained debugging")
                 } footer: {
-                    Text("本机日志支持蓝牙及离线记录，不自动请求 Relay 或安卓。手动读取需有已验证的 VoWLAN 连接。日志可能包含电话号码、短信正文和设备标识；排查结束后请关闭 Verbose，分享前检查内容。")
+                    Text("Local logs support Bluetooth and offline recording and do not automatically contact Relay or Android. Manual reading requires a verified VoWLAN connection. Logs may contain phone numbers, message text, and device identifiers; turn off Verbose when troubleshooting is done, and review content before sharing.")
                 }
 
                 Section {
-                    Picker("筛选", selection: $filter) {
+                    Picker("Filter", selection: $filter) {
                         ForEach(AgentVerboseTraceFilter.allCases) { item in
                             Text(item.rawValue).tag(item)
                         }
@@ -346,14 +346,14 @@ struct AgentVerboseTraceView: View {
                     }
                 }
 
-                Section("实时命令链路") {
+                Section("Live command links") {
                     if filteredTimeline.isEmpty {
                         VStack(spacing: 10) {
                             Image(systemName: "waveform.path.ecg")
                                 .font(.title2)
                                 .foregroundStyle(.secondary)
-                            Text("暂无链路事件").font(.headline)
-                            Text(model.enabled ? "执行拨号、短信、设置或 AT 操作后会实时显示。" : "请先开启 Verbose 链路模式。")
+                            Text("No link events yet").font(.headline)
+                            Text(model.enabled ? "They will appear live after you dial, send a message, change a setting, or run an AT operation." : "Turn on Verbose link mode first.")
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                                 .multilineTextAlignment(.center)
@@ -370,7 +370,7 @@ struct AgentVerboseTraceView: View {
                             .buttonStyle(.plain)
                             .id(item.id)
                             .contextMenu {
-                                Button("复制本条", systemImage: "doc.on.doc") {
+                                Button("Copy this entry", systemImage: "doc.on.doc") {
                                     UIPasteboard.general.string = "\(item.title)\n\(item.detail)"
                                 }
                             }
@@ -378,7 +378,7 @@ struct AgentVerboseTraceView: View {
                     }
                 }
         }
-        .navigationTitle("Verbose 日志调试")
+        .navigationTitle("Verbose log debugging")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
@@ -394,7 +394,7 @@ struct AgentVerboseTraceView: View {
                 } label: {
                     Image(systemName: "square.and.arrow.up")
                 }
-                .accessibilityLabel("分享 TXT 调试日志")
+                .accessibilityLabel("Share TXT debug log")
                 Button(role: .destructive) { showingClearConfirmation = true } label: {
                     Image(systemName: "trash")
                 }
@@ -411,9 +411,9 @@ struct AgentVerboseTraceView: View {
         .sheet(item: $selectedItem) { item in
             AgentVerboseTraceDetailView(item: item)
         }
-        .confirmationDialog("清除本机调试日志？不会删除安卓日志、短信或通话记录。", isPresented: $showingClearConfirmation) {
-            Button("清除本机日志", role: .destructive) { Task { await model.clear() } }
-            Button("取消", role: .cancel) {}
+        .confirmationDialog("Clear local debug logs? This will not delete Android logs, messages, or call history.", isPresented: $showingClearConfirmation) {
+            Button("Clear local logs", role: .destructive) { Task { await model.clear() } }
+            Button("Cancel", role: .cancel) {}
         }
     }
 
@@ -473,29 +473,29 @@ private struct AgentVerboseTraceDetailView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("事件") {
-                    LabeledContent("来源", value: item.source)
-                    LabeledContent("分类", value: item.category)
+                Section("Event") {
+                    LabeledContent("Source", value: item.source)
+                    LabeledContent("Category", value: item.category)
                     if let traceID = item.traceID { LabeledContent("Trace ID", value: traceID) }
-                    LabeledContent("时间", value: item.timestamp.formatted(.iso8601))
+                    LabeledContent("Time", value: item.timestamp.formatted(.iso8601))
                 }
-                Section("命令") {
+                Section("Command") {
                     Text(item.title).font(.system(.body, design: .monospaced)).textSelection(.enabled)
                 }
                 if !item.detail.isEmpty {
-                    Section("完整内容") {
+                    Section("Full content") {
                         Text(item.detail).font(.system(.caption, design: .monospaced)).textSelection(.enabled)
                     }
                 }
             }
-            .navigationTitle("链路详情")
+            .navigationTitle("Link details")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("关闭") { dismiss() }
+                    Button("Close") { dismiss() }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("复制", systemImage: "doc.on.doc") {
+                    Button("Copy", systemImage: "doc.on.doc") {
                         UIPasteboard.general.string = "\(item.title)\n\(item.detail)"
                     }
                 }
