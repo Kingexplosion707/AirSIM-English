@@ -21,7 +21,7 @@ enum LocalAgentRoute: Equatable, Sendable {
     var traceDescription: String {
         switch self {
         case let .vowlan(endpoint, _): return VoWLANNetworkRoutePolicy.isOverlayHost(endpoint.host)
-            ? "VoWLAN · VPN 直连" : "VoWLAN · 同一局域网"
+            ? "VoWLAN · Direct VPN connection" : "VoWLAN · Same local network"
         }
     }
 
@@ -229,6 +229,7 @@ struct AirSIMAPI: Sendable {
     // MARK: 状态、网络、定位与调试
 
     func modemStatus() async throws -> ModemStatus { try await get("api/status") }
+    func feedbackSnapshot() async throws -> AgentFeedbackSnapshot { try await get("api/feedback") }
     func moduleDebug(after sequence: UInt64 = 0, limit: Int = 400) async throws -> ModuleDebugSnapshot {
         var components = URLComponents(url: endpoint("api/debug"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
@@ -335,7 +336,26 @@ struct AirSIMAPI: Sendable {
             VoWLANController.apply(signed, to: &request)
         }
         do {
-            let response = try await transport.send(request, uploadFileURL: uploadFileURL)
+            var response = try await transport.send(request, uploadFileURL: uploadFileURL)
+            // Long-poll requests can be queued behind connection setup; a
+            // signature created before that queue may be older than the
+            // Android gateway's 30 s clock window and return 401. Retrying an
+            // idempotent GET with a fresh nonce/timestamp is safe; never retry
+            // dial/SMS/answer POSTs here.
+            if response.statusCode == 401, method == "GET",
+               let credential = route.credential {
+                var retry = originalRequest
+                if let trace {
+                    retry.setValue(trace.id, forHTTPHeaderField: "X-AirSIM-Trace-ID")
+                }
+                let signed = try VoWLANRequestSigner(credential: credential).sign(
+                    method: method,
+                    path: path,
+                    body: retry.httpBody ?? Data()
+                )
+                VoWLANController.apply(signed, to: &retry)
+                response = try await transport.send(retry, uploadFileURL: uploadFileURL)
+            }
             if let trace {
                 await AgentVerboseTraceRecorder.shared.finish(
                     trace,
@@ -358,7 +378,7 @@ struct AirSIMAPI: Sendable {
         do {
             return try decoder.decode(type, from: data)
         } catch {
-            throw APIError.unreadablePayload("模块代理返回的数据无法识别：\(error.localizedDescription)")
+            throw APIError.unreadablePayload("Data returned by the module proxy could not be recognized: \(error.localizedDescription)")
         }
     }
 
@@ -377,8 +397,8 @@ enum APIError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .invalidResponse: return "模块代理返回了无效响应"
-        case let .http(status, message): return message?.isEmpty == false ? message : "请求失败（HTTP \(status)）"
+        case .invalidResponse: return "Module proxy returned an invalid response"
+        case let .http(status, message): return message?.isEmpty == false ? message : "Request failed (HTTP \(status))"
         case let .unreadablePayload(message): return message
         }
     }
