@@ -83,14 +83,14 @@ actor AgentVerboseTraceRecorder {
         append(
             context,
             stage: .request,
-            detail: bodyBytes > 0 ? "发起请求 · body \(bodyBytes) B" : "发起请求"
+            detail: bodyBytes > 0 ? "Request started · body \(bodyBytes) B" : "Request started"
         )
         return context
     }
 
     func recordRoute(_ context: AgentVerboseTraceContext, route: String, attempt: Int, error: String? = nil) {
         guard enabled else { return }
-        var detail = "第 \(attempt) 次尝试 · \(route)"
+        var detail = "Attempt \(attempt) · \(route)"
         if let error, !error.isEmpty { detail += " · \(error)" }
         append(context, stage: .route, detail: detail)
     }
@@ -157,7 +157,7 @@ actor AgentVerboseTraceRecorder {
         entries.append(AgentVerboseTraceEntry(
             id: UUID(), traceID: "--------", timestamp: Date(),
             stage: phase == "failed" ? .failure : .event,
-            method: "AUDIO", path: "通话音频启动", detail: "",
+            method: "AUDIO", path: "Call audio started", detail: "",
             elapsedMilliseconds: elapsedMilliseconds.map { max(0, $0) },
             source: "APP", category: "call-audio", fields: ["phase": phase]
         ))
@@ -183,7 +183,7 @@ actor AgentVerboseTraceRecorder {
             current = value.userInfo[NSUnderlyingErrorKey] as? NSError
         }
         recordEvent(source: "APP", category: category, phase: phase,
-                    title: "链路异常", detail: Self.redact(error.localizedDescription), fields: fields, isFailure: true)
+                    title: "Link error", detail: Self.redact(error.localizedDescription), fields: fields, isFailure: true)
     }
 
     private static func redact(_ text: String) -> String {
